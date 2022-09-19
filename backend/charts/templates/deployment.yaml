@@ -1,7 +1,7 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ include "auth.fullname" . }}
+  name: {{ template "auth.fullname" . }}-deployment
   labels:
     {{- include "auth.labels" . | nindent 4 }}
 spec:
@@ -10,7 +10,7 @@ spec:
   {{- end }}
   selector:
     matchLabels:
-      {{- include "auth.selectorLabels" . | nindent 6 }}
+      app: {{ template "auth.fullname" . }}
   template:
     metadata:
       {{- with .Values.podAnnotations }}
@@ -18,35 +18,40 @@ spec:
         {{- toYaml . | nindent 8 }}
       {{- end }}
       labels:
-        {{- include "auth.selectorLabels" . | nindent 8 }}
+        app: {{ template "auth.fullname" . }}
     spec:
-      {{- with .Values.imagePullSecrets }}
-      imagePullSecrets:
-        {{- toYaml . | nindent 8 }}
-      {{- end }}
-      serviceAccountName: {{ include "auth.serviceAccountName" . }}
-      securityContext:
-        {{- toYaml .Values.podSecurityContext | nindent 8 }}
       containers:
-        - name: {{ .Chart.Name }}
-          securityContext:
+      - image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+        imagePullPolicy: {{ .Values.image.pullPolicy }}
+        securityContext:
             {{- toYaml .Values.securityContext | nindent 12 }}
-          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
-          imagePullPolicy: {{ .Values.image.pullPolicy }}
-          ports:
-            - name: http
-              containerPort: 80
-              protocol: TCP
-          livenessProbe:
-            httpGet:
-              path: /
-              port: http
-          readinessProbe:
-            httpGet:
-              path: /
-              port: http
-          resources:
+        name: {{ template "auth.fullname" . }}
+        ports:
+        - name: http
+          containerPort: 80
+          protocol: TCP
+        env:
+        - name: ASPNETCORE_ENVIRONMENT
+          value: {{ .Values.aspnetcoreEnvironment | default "Production" }}
+        volumeMounts:
+          {{- if .Values.deployment.appsettings }}
+          - name: appsettings-volume
+            mountPath: /app/appsettings.Active.json
+            subPath: appsettings.Active.json
+          {{- end }}
+        resources:
             {{- toYaml .Values.resources | nindent 12 }}
+      imagePullSecrets:
+      - name: {{ template "auth.fullname" . }}-docker-secret
+      volumes:
+      {{- if .Values.deployment.appsettings }}
+      - name: appsettings-volume
+        configMap:
+          name: {{ template "auth.fullname" . }}-env
+          items:
+          - key: appsettings.Active.json 
+            path: appsettings.Active.json
+      {{- end }}
       {{- with .Values.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}
