@@ -14,10 +14,8 @@ namespace Data.Queries
 
         public async Task<User?> GetUserByUserNameAsync(string login)
         {
-            var tt =  await GetUsersAsQueryable()
+            return await GetUsersAsQueryable()
                 .SingleOrDefaultAsync(x => x.UserName == login);
-
-            return tt;
         }
 
         private IQueryable<User?> GetUsersAsQueryable()

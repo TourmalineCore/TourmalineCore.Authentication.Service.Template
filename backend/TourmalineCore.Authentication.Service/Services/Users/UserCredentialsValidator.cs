@@ -8,7 +8,6 @@ namespace TourmalineCore.Authentication.Service.Services.Users
     {
         private readonly AppDbContext _appDbContext;
 
-
         private readonly ILogger<UserCredentialsValidator> _logger;
         private readonly IUserQuery _userQuery;
 

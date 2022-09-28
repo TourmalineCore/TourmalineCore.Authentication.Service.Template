@@ -11,7 +11,6 @@ using TourmalineCore.Authentication.Service.Services.Callbacks;
 using TourmalineCore.Authentication.Service.Services.Users;
 
 var builder = WebApplication.CreateBuilder(args);
-var hostBuilder = new HostBuilder();
 var configuration = builder.Configuration;
 const string defaultConnection = "DefaultConnection";
 
@@ -21,22 +20,33 @@ builder.Services.AddCors();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
-builder
-    .Services.AddDbContext<AppDbContext>(options =>
-        {
-            AppDbContext.ConfigureContextOptions(options, configuration.GetConnectionString(defaultConnection));
-        }
-);
+if (Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT") == "Tests")
+{
+    builder.Services
+        .AddDbContext<AppDbContext>(options =>
+            options.UseInMemoryDatabase("TCAuthTest")
+        );
+}
+else
+{
+    builder
+        .Services.AddDbContext<AppDbContext>(options =>
+            {
+                AppDbContext.ConfigureContextOptions(options, configuration.GetConnectionString(defaultConnection));
+            }
+        );
+}
 
 var authenticationOptions = configuration.GetSection(nameof(AuthenticationOptions)).Get<RefreshAuthenticationOptions>();
 
 builder.Services
     .AddJwtAuthenticationWithIdentity<AppDbContext, User, long>()
     .AddLoginWithRefresh(authenticationOptions)
+    .AddRefreshConfidenceInterval()
+    .AddLogout()
     .AddUserCredentialsValidator<UserCredentialsValidator>()
     .WithUserClaimsProvider<UserClaimsProvider>(UserClaimsProvider.PermissionsClaimType)
-    .AddRegistration()
-    .AddLogout();
+    .AddRegistration();
 
 
 builder.Services.AddSingleton<AuthCallbacks>();
@@ -46,7 +56,7 @@ builder.Services.AddTransient<IUserQuery, UserQuery>();
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.
-if (app.Environment.IsDevelopment())
+if (app.Environment.IsEnvironment("Debug"))
 {
     app.UseSwagger();
     app.UseSwaggerUI();
@@ -59,31 +69,38 @@ app
     .OnLoginExecuted(serviceScope.ServiceProvider.GetRequiredService<AuthCallbacks>().OnLoginExecuted)
     .UseDefaultLoginMiddleware(new LoginEndpointOptions
         {
-            LoginEndpointRoute = "/auth/login",
+            LoginEndpointRoute = "/auth/login"
         }
     )
     .UseRefreshTokenMiddleware(new RefreshEndpointOptions
         {
-            RefreshEndpointRoute = "/auth/refresh",
+            RefreshEndpointRoute = "/auth/refresh"
         }
     )
     .UseRefreshTokenLogoutMiddleware(new LogoutEndpointOptions
         {
-            LogoutEndpointRoute = "/auth/logout",
+            LogoutEndpointRoute = "/auth/logout"
         }
     )
-    .UseRegistration<User, long, RegistrationRequestModel>(requestModel => new User()
+    .UseRegistration<User, long, RegistrationRequestModel>(requestModel => new User
         {
             UserName = requestModel.Login,
-            PasswordHash = requestModel.Password,
+            PasswordHash = requestModel.Password
         },
-        new RegistrationEndpointOptions()
+        new RegistrationEndpointOptions
         {
-            RegistrationEndpointRoute = "/auth/registration"
+            RegistrationEndpointRoute = "/auth/register"
         });
 
-var context = serviceScope.ServiceProvider.GetRequiredService<AppDbContext>();
-context.Database.Migrate();
+if (!app.Environment.IsEnvironment("Tests"))
+{
+    var context = serviceScope.ServiceProvider.GetRequiredService<AppDbContext>();
+    context.Database.Migrate();
+}
+else
+{
+    app.UseDefaultDbUser<AppDbContext, User, long>("admin", "admin");
+}
 
 app.UseRouting();
 
@@ -94,3 +111,7 @@ app.UseAuthorization();
 app.MapControllers();
 
 app.Run();
+
+public partial class Program
+{
+}
