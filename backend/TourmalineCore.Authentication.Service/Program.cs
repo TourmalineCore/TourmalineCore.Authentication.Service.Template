@@ -20,22 +20,13 @@ builder.Services.AddCors();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
-if (Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT") == "Tests")
-{
-    builder.Services
-        .AddDbContext<AppDbContext>(options =>
-            options.UseInMemoryDatabase("TCAuthTest")
-        );
-}
-else
-{
+if (Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT") != "Tests")
     builder
         .Services.AddDbContext<AppDbContext>(options =>
             {
                 AppDbContext.ConfigureContextOptions(options, configuration.GetConnectionString(defaultConnection));
             }
         );
-}
 
 var authenticationOptions = configuration.GetSection(nameof(AuthenticationOptions)).Get<RefreshAuthenticationOptions>();
 
@@ -109,6 +100,8 @@ app.UseHttpsRedirection();
 app.UseAuthorization();
 
 app.MapControllers();
+
+app.UseEndpoints(endpoints => { endpoints.MapControllers(); });
 
 app.Run();
 

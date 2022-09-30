@@ -24,24 +24,12 @@ namespace TourmalineCore.Authentication.Service.Services.Users
 
         public async Task<List<Claim>> GetUserClaimsAsync(string login)
         {
-            var user = await _userQuery.GetUserByUserNameAsync(login);
+            var user = await _userQuery.FindUserByUserNameAsync(login);
 
-            if (user == null)
-            {
-                _logger.LogError($"[{nameof(UserClaimsProvider)}]: Could not find a user with login [{login}]");
-
-                throw new NullReferenceException();
-            }
-
-            return await BuildClaimsAsync(login, user.Id);
-        }
-
-        private async Task<List<Claim>> BuildClaimsAsync(string login, long userId)
-        {
             var claims = new List<Claim>
             {
                 new Claim(NameIdentifireClaimType, login),
-                new Claim(IdClaimType, userId.ToString()),
+                new Claim(IdClaimType, user.Id.ToString()),
             };
 
             return claims;

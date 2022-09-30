@@ -12,7 +12,7 @@ namespace Data.Queries
             _context = context;
         }
 
-        public async Task<User?> GetUserByUserNameAsync(string login)
+        public async Task<User?> FindUserByUserNameAsync(string login)
         {
             return await GetUsersAsQueryable()
                 .SingleOrDefaultAsync(x => x.UserName == login);

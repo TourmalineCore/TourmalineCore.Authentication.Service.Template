@@ -6,7 +6,11 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Threading.Tasks;
+using Data;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using TourmalineCore.AspNetCore.JwtAuthentication.Core.Models.Request;
 using TourmalineCore.AspNetCore.JwtAuthentication.Core.Models.Response;
 using Xunit;
@@ -15,23 +19,38 @@ namespace Tests.Integration;
 
 public class TestBase : IClassFixture<WebApplicationFactory<Program>>
 {
-    private readonly WebApplicationFactory<Program> _factory;
     private readonly JsonSerializerOptions _jsonSerializerSettings;
+    private readonly WebApplicationFactory<Program> _factory;
+    private readonly HttpClient _client;
 
     private const string LoginUrl = "/auth/login";
     private const string RegisterUrl = "/auth/register";
     private const string RefreshUrl = "/auth/refresh";
     private const string LogoutUrl = "/auth/logout";
 
-    public TestBase(WebApplicationFactory<Program> factory)
+    private readonly string _dbName = Guid.NewGuid().ToString();
+
+
+    protected TestBase(WebApplicationFactory<Program> factory)
     {
         Environment.SetEnvironmentVariable("ASPNETCORE_ENVIRONMENT", "Tests");
 
-        _factory = factory;
+        _factory = factory.WithWebHostBuilder(builder =>
+        {
+            builder.ConfigureServices(services =>
+            {
+                services.AddDbContext<AppDbContext>(options =>
+                {
+                    options.UseInMemoryDatabase(_dbName);
+                });
+            });
+        });
+
+        _client = _factory.CreateClient();
 
         _jsonSerializerSettings = new JsonSerializerOptions
         {
-            IgnoreNullValues = true,
+            DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
             AllowTrailingCommas = true,
             WriteIndented = true,
             PropertyNameCaseInsensitive = true,
@@ -46,8 +65,6 @@ public class TestBase : IClassFixture<WebApplicationFactory<Program>>
     internal async Task<(HttpResponseMessage response, AuthResponseModel authModel)> RegistrationAsync(string login,
         string password)
     {
-        var client = _factory.CreateClient();
-
         var body = JsonContent.Create(new RegistrationRequestModel
             {
                 Login = login,
@@ -55,9 +72,9 @@ public class TestBase : IClassFixture<WebApplicationFactory<Program>>
             }
         );
 
-        var response = await client.PostAsync(RegisterUrl, body);
+        var response = await _client.PostAsync(RegisterUrl, body);
         var result =
-            JsonSerializer.Deserialize<AuthResponseModel>(response.Content.ReadAsStringAsync().Result,
+            JsonSerializer.Deserialize<AuthResponseModel>(await response.Content.ReadAsStringAsync(),
                 _jsonSerializerSettings);
         return (response, result);
     }
@@ -65,8 +82,6 @@ public class TestBase : IClassFixture<WebApplicationFactory<Program>>
     internal async Task<(HttpResponseMessage response, AuthResponseModel authModel)> LoginAsync(string login,
         string password)
     {
-        var client = _factory.CreateClient();
-
         var body = JsonContent.Create(new LoginRequestModel
             {
                 Login = login,
@@ -74,10 +89,10 @@ public class TestBase : IClassFixture<WebApplicationFactory<Program>>
             }
         );
 
-        var response = await client.PostAsync(LoginUrl, body);
+        var response = await _client.PostAsync(LoginUrl, body);
 
         var authModel =
-            JsonSerializer.Deserialize<AuthResponseModel>(response.Content.ReadAsStringAsync().Result,
+            JsonSerializer.Deserialize<AuthResponseModel>(await response.Content.ReadAsStringAsync(),
                 _jsonSerializerSettings);
 
         return (response, authModel);
@@ -86,16 +101,14 @@ public class TestBase : IClassFixture<WebApplicationFactory<Program>>
     internal async Task<(HttpResponseMessage response, AuthResponseModel authModel)> CallRefreshAsync(
         AuthResponseModel authResponseModel)
     {
-        var client = _factory.CreateClient();
-
         var body = JsonContent.Create(new RefreshTokenRequestModel
             {
                 RefreshTokenValue = Guid.Parse(authResponseModel.RefreshToken.Value)
             }
         );
 
-        var response = await client.PostAsync(RefreshUrl, body);
-        client.DefaultRequestHeaders.Authorization =
+        var response = await _client.PostAsync(RefreshUrl, body);
+        _client.DefaultRequestHeaders.Authorization =
             new AuthenticationHeaderValue("Bearer", authResponseModel.AccessToken.Value);
         var result =
             JsonSerializer.Deserialize<AuthResponseModel>(await response.Content.ReadAsStringAsync(),
@@ -105,15 +118,13 @@ public class TestBase : IClassFixture<WebApplicationFactory<Program>>
 
     internal async Task<HttpStatusCode> LogoutAsync(AuthResponseModel authResponseModel)
     {
-        var client = _factory.CreateClient();
-
         var body = JsonContent.Create(new RefreshTokenRequestModel
             {
                 RefreshTokenValue = Guid.Parse(authResponseModel.RefreshToken.Value)
             }
         );
 
-        var response = await client.PostAsync(LogoutUrl, body);
+        var response = await _client.PostAsync(LogoutUrl, body);
         return response.StatusCode;
     }
 }
