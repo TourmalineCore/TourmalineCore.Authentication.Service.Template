@@ -10,8 +10,8 @@ namespace Tests.Integration;
 
 public class RegistrationAndLoginTests : TestBase
 {
-    private const string Login = "test_login";
-    private const string Password = "testtesTtest!1";
+    private const string Login = "admin";
+    private const string Password = "admin";
 
     public RegistrationAndLoginTests(WebApplicationFactory<Program> factory)
         : base(factory)
@@ -19,29 +19,18 @@ public class RegistrationAndLoginTests : TestBase
     }
 
     [Fact]
-    public async Task Registration_WithInvalidCreds()
+    public async Task Login_WithInvalidCreds()
     {
-        var registrationResponse = await RegistrationAsync(Login, "1");
+        var registrationResponse = await LoginAsync(Login, "1");
 
         Assert.NotEqual(HttpStatusCode.OK, registrationResponse.response.StatusCode);
     }
 
     [Fact]
-    public async Task Login_WithInvalidCreds()
+    public async Task Login_WithValidCreds()
     {
         var registrationResponse = await LoginAsync("invalid", "invalid");
 
         Assert.Equal(HttpStatusCode.Unauthorized, registrationResponse.response.StatusCode);
-    }
-
-    [Fact]
-    public async Task Registration_ThenLoginForCreatedUser_ReturnsTokens()
-    {
-        var registrationResponse = await RegistrationAsync(Login, Password);
-        var (_, authModel) = await LoginAsync(Login, Password);
-
-        Assert.Equal(HttpStatusCode.OK, registrationResponse.response.StatusCode);
-        Assert.False(string.IsNullOrWhiteSpace(authModel.AccessToken.Value));
-        Assert.False(string.IsNullOrWhiteSpace(authModel.RefreshToken.Value));
     }
 }

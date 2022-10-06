@@ -72,16 +72,7 @@ app
         {
             LogoutEndpointRoute = "/auth/logout"
         }
-    )
-    .UseRegistration<User, long, RegistrationRequestModel>(requestModel => new User
-        {
-            UserName = requestModel.Login,
-            PasswordHash = requestModel.Password
-        },
-        new RegistrationEndpointOptions
-        {
-            RegistrationEndpointRoute = "/auth/register"
-        });
+    );
 
 if (!app.Environment.IsEnvironment("Tests"))
 {
