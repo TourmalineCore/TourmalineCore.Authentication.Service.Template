@@ -35,7 +35,8 @@ builder.Services
     .AddLoginWithRefresh(authenticationOptions)
     .AddRefreshConfidenceInterval()
     .AddLogout()
-    .AddUserCredentialsValidator<UserCredentialsValidator>()
+    // use credentials validator if you have additional validations
+    //.AddUserCredentialsValidator<UserCredentialsValidator>()
     .WithUserClaimsProvider<UserClaimsProvider>(UserClaimsProvider.PermissionsClaimType)
     .AddRegistration();
 
@@ -45,6 +46,14 @@ builder.Services.AddTransient<IUserQuery, UserQuery>();
 
 
 var app = builder.Build();
+
+app.UseCors(
+    corsPolicyBuilder => corsPolicyBuilder
+        .AllowAnyHeader()
+        .SetIsOriginAllowed(host => true)
+        .AllowAnyMethod()
+        .AllowAnyOrigin()
+);
 
 // Configure the HTTP request pipeline.
 if (app.Environment.IsEnvironment("Debug"))
@@ -72,16 +81,21 @@ app
         {
             LogoutEndpointRoute = "/auth/logout"
         }
-    );
+    )
+    .UseRegistration<User, long, RegistrationRequestModel>(x => new User
+        {
+            UserName = x.Login,
+            NormalizedUserName = x.Login,
+        },
+        new RegistrationEndpointOptions
+        {
+            RegistrationEndpointRoute = "/auth/register"
+        });
 
 if (!app.Environment.IsEnvironment("Tests"))
 {
     var context = serviceScope.ServiceProvider.GetRequiredService<AppDbContext>();
     context.Database.Migrate();
-}
-else
-{
-    app.UseDefaultDbUser<AppDbContext, User, long>("admin", "admin");
 }
 
 app.UseRouting();
