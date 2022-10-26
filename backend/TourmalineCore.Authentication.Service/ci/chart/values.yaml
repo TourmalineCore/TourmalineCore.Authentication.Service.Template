@@ -39,7 +39,7 @@ securityContext: {}
   # runAsUser: 1000
 
 ingress:
-  host:
+  host: # secret
 
 resources:
   # We usually recommend not to specify default resources and to leave this as a conscious
